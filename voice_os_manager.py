@@ -98,12 +98,12 @@ start_entry.pack(pady=2)
 start_btn = ttk.Button(start_frame, text="Start", command=lambda: start_process(start_entry.get()))
 start_btn.pack()
 
-# Kill Process
+# Kill Process (Reverted to single input field)
 kill_frame = tk.Frame(button_frame, bg="#3A4A4B")
 kill_frame.pack(side="left", padx=5)
 kill_label = tk.Label(kill_frame, text="KILL PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 kill_label.pack()
-kill_entry = tk.Entry(kill_frame, width=10, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
+kill_entry = tk.Entry(kill_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
 kill_entry.pack(pady=2)
 kill_btn = ttk.Button(kill_frame, text="Kill", command=lambda: kill_process(kill_entry.get()))
 kill_btn.pack()
@@ -263,22 +263,53 @@ def start_process(app):
     except Exception as e:
         messagebox.showerror("Error", f"Failed to start {app}: {e}")
 
-def kill_process(pid):
+def kill_process(identifier):
+    if not identifier.strip():
+        messagebox.showerror("Error", "Please enter a PID or process name")
+        return
+    
+    # Check if the identifier is a PID (numeric)
     try:
-        pid = int(pid)
-        p = psutil.Process(pid)
-        p.terminate()
-        time.sleep(0.5)
-        if p.is_running():
-            p.kill()
-    except psutil.NoSuchProcess:
-        messagebox.showerror("Error", f"Process {pid} not found")
-    except psutil.AccessDenied:
-        messagebox.showerror("Error", f"Permission denied for {pid}. Run with sudo.")
+        pid = int(identifier)
+        # Terminate by PID
+        try:
+            p = psutil.Process(pid)
+            process_name = p.name()
+            p.terminate()
+            time.sleep(0.5)
+            if p.is_running():
+                p.kill()
+            messagebox.showinfo("Success", f"Process {process_name} (PID: {pid}) terminated successfully")
+        except psutil.NoSuchProcess:
+            messagebox.showerror("Error", f"Process with PID {pid} not found")
+        except psutil.AccessDenied:
+            messagebox.showerror("Error", f"Permission denied for PID {pid}. Run with sudo.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to kill PID {pid}: {e}")
     except ValueError:
-        messagebox.showerror("Error", "Invalid PID - enter a number")
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to kill {pid}: {e}")
+        # If not a number, treat it as a process name
+        process_name = identifier
+        found = False
+        for proc in psutil.process_iter(['pid', 'name']):
+            if proc.info['name'].lower() == process_name.lower():
+                try:
+                    proc.terminate()
+                    time.sleep(0.5)
+                    if proc.is_running():
+                        proc.kill()
+                    messagebox.showinfo("Success", f"Process {process_name} (PID: {proc.info['pid']}) terminated successfully")
+                    found = True
+                    break  # Terminate only the first matching process
+                except psutil.NoSuchProcess:
+                    continue
+                except psutil.AccessDenied:
+                    messagebox.showerror("Error", f"Permission denied for {process_name} (PID: {proc.info['pid']}). Run with sudo.")
+                    return
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to kill {process_name}: {e}")
+                    return
+        if not found:
+            messagebox.showerror("Error", f"Process {process_name} not found")
 
 def prioritize_process(app):
     if not app.strip():
@@ -351,8 +382,8 @@ def process_command(command):
         app = command.replace("start ", "")
         start_process(app)
     elif "kill" in command:
-        pid = command.replace("kill ", "")
-        kill_process(pid)
+        identifier = command.replace("kill ", "")
+        kill_process(identifier)  # Works with both PID and name
     elif "prioritize" in command:
         app = command.replace("prioritize ", "")
         prioritize_process(app)
