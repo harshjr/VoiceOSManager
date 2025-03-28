@@ -80,34 +80,6 @@ def resize_columns(event=None):
 
 root.bind("<Configure>", resize_columns)
 
-# Custom Progress Bars (Below Table)
-progress_frame = tk.Frame(process_frame, bg="#3A4A4B")
-progress_frame.pack(fill="x", pady=5)
-
-# CPU Progress Bar
-cpu_frame = tk.Frame(progress_frame, bg="#3A4A4B")
-cpu_frame.pack(side="left", padx=5)
-cpu_progress_label = tk.Label(cpu_frame, text="CPU %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
-cpu_progress_label.pack(side="left")
-cpu_canvas = tk.Canvas(cpu_frame, width=150, height=20, bg="#3A4A4B", highlightthickness=0)
-cpu_canvas.pack(side="left")
-# Draw white-bordered rectangle (100%)
-cpu_canvas.create_rectangle(2, 2, 148, 18, outline="#FFFFFF", fill="#3A4A4B", tags="cpu_border")
-# Draw green fill (initially 0%)
-cpu_canvas.create_rectangle(2, 2, 2, 18, fill="#00FF00", outline="", tags="cpu_fill")
-
-# Memory Progress Bar
-mem_frame = tk.Frame(progress_frame, bg="#3A4A4B")
-mem_frame.pack(side="left", padx=5)
-mem_progress_label = tk.Label(mem_frame, text="Memory %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
-mem_progress_label.pack(side="left")
-mem_canvas = tk.Canvas(mem_frame, width=150, height=20, bg="#3A4A4B", highlightthickness=0)
-mem_canvas.pack(side="left")
-# Draw white-bordered rectangle (100%)
-mem_canvas.create_rectangle(2, 2, 148, 18, outline="#FFFFFF", fill="#3A4A4B", tags="mem_border")
-# Draw green fill (initially 0%)
-mem_canvas.create_rectangle(2, 2, 2, 18, fill="#00FF00", outline="", tags="mem_fill")
-
 # Control Buttons (Centered in Middle)
 control_frame = tk.Frame(root, bg="#3A4A4B")
 control_frame.grid(row=2, column=0, pady=10, sticky="ew")
@@ -196,23 +168,6 @@ def update_process_list():
     tree.tag_configure("odd", background="#4A5A5B")
     update_graph()
     root.after(5000, update_process_list)
-
-# Progress Bar Update on Selection
-def on_select(event):
-    selected = tree.selection()
-    if selected:
-        values = tree.item(selected[0], "values")
-        cpu = float(values[2]) if values[2] != "N/A" else 0
-        mem = float(values[3]) if values[3] != "N/A" else 0
-        print(f"Selected process - CPU: {cpu}, Memory: {mem}")  # Debug print
-        # Update CPU progress bar
-        cpu_width = (cpu / 100) * 146  # 146 is the inner width (148 - 2)
-        cpu_canvas.coords("cpu_fill", 2, 2, 2 + cpu_width, 18)
-        # Update Memory progress bar
-        mem_width = (mem / 100) * 146
-        mem_canvas.coords("mem_fill", 2, 2, 2 + mem_width, 18)
-
-tree.bind("<<TreeviewSelect>>", on_select)
 
 def search_process(name):
     if not name.strip():
