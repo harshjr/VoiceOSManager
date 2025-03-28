@@ -7,125 +7,188 @@ from tkinter import ttk, messagebox
 import threading
 import time
 from multiprocessing import Process, Pipe
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from ttkthemes import ThemedTk
 
-# GUI Setup
-root = tk.Tk()
+# GUI Setup with Theme
+root = ThemedTk(theme="equilux")
 root.title("VoiceOS Manager")
-root.geometry("900x700")
-root.configure(bg="#2E2E2E")
+root.geometry("800x600")  # Smaller window for simplicity
+root.configure(bg="#3A4A4B")  # Lighter background
 
 # Styling
 style = ttk.Style()
-style.theme_use("clam")
-style.configure("Treeview", background="#3C3C3C", foreground="white", fieldbackground="#3C3C3C", rowheight=25)
-style.configure("Treeview.Heading", background="#4A4A4A", foreground="white", font=("Arial", 10, "bold"))
-style.configure("TButton", font=("Arial", 10), padding=5)
+style.configure("Treeview", background="#3A4A4B", foreground="#66DFFF", fieldbackground="#3A4A4B", rowheight=25)
+style.configure("Treeview.Heading", background="#4A5A5B", foreground="#66DFFF", font=("Orbitron", 10, "bold"))
+style.map("Treeview", background=[("selected", "#66DFFF")])
+style.configure("TButton", font=("Orbitron", 9), padding=6, background="#66DFFF", foreground="white")
+style.map("TButton", background=[("active", "#99EFFF")])  # Lighter hover
+style.configure("Horizontal.TProgressbar", troughcolor="#3A4A4B", background="#66DFFF")
 
-# Header Label
-header = tk.Label(root, text="VoiceOS Manager", font=("Arial", 18, "bold"), bg="#2E2E2E", fg="#00D4FF")
-header.pack(pady=10)
+# Header
+header = tk.Label(root, text="VoiceOS Manager", font=("Orbitron", 16, "bold"), bg="#3A4A4B", fg="white")
+header.grid(row=0, column=0, columnspan=3, pady=10)
 
-# Frame for Process List
-process_frame = tk.Frame(root, bg="#2E2E2E")
-process_frame.pack(fill="both", expand=True, padx=10, pady=5)
-
-# Process List Table
-tree = ttk.Treeview(process_frame, columns=("PID", "Name", "CPU", "Memory"), show="headings", height=15)
+# Process List (Top)
+process_frame = tk.Frame(root, bg="#3A4A4B")
+process_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5, sticky="nsew")
+process_label = tk.Label(process_frame, text="VOICESS PROCESS", font=("Orbitron", 10, "bold"), bg="#3A4A4B", fg="white")
+process_label.pack()
+tree = ttk.Treeview(process_frame, columns=("PID", "Name", "CPU", "Memory"), show="headings", height=8)
 tree.heading("PID", text="PID")
 tree.heading("Name", text="Process Name")
 tree.heading("CPU", text="CPU %")
 tree.heading("Memory", text="Memory %")
-tree.column("PID", width=80, anchor="center")
-tree.column("Name", width=250)
-tree.column("CPU", width=100, anchor="center")
-tree.column("Memory", width=100, anchor="center")
-tree.pack(side="left", fill="both", expand=True)
+tree.column("PID", width=60, anchor="center")
+tree.column("Name", width=150)
+tree.column("CPU", width=80, anchor="center")
+tree.column("Memory", width=80, anchor="center")
+tree.pack(fill="both", expand=True)
 
-# Scrollbar for Process List
 scrollbar = ttk.Scrollbar(process_frame, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=scrollbar.set)
 scrollbar.pack(side="right", fill="y")
 
-# Control Panel Frame
-control_frame = tk.Frame(root, bg="#2E2E2E")
-control_frame.pack(fill="x", padx=10, pady=5)
+# Progress Bars (Below Table)
+progress_frame = tk.Frame(process_frame, bg="#3A4A4B")
+progress_frame.pack(fill="x", pady=5)
+cpu_progress_label = tk.Label(progress_frame, text="CPU %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
+cpu_progress_label.pack(side="left", padx=5)
+cpu_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Horizontal.TProgressbar")
+cpu_progress.pack(side="left", padx=5)
+mem_progress_label = tk.Label(progress_frame, text="Memory %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
+mem_progress_label.pack(side="left", padx=5)
+mem_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Horizontal.TProgressbar")
+mem_progress.pack(side="left", padx=5)
 
-# Buttons and Entries
-refresh_btn = ttk.Button(control_frame, text="Refresh", command=lambda: update_process_list())
-refresh_btn.grid(row=0, column=0, padx=5)
+# Control Buttons (Middle)
+control_frame = tk.Frame(root, bg="#3A4A4B")
+control_frame.grid(row=2, column=0, columnspan=3, pady=10)
 
-start_entry = tk.Entry(control_frame, width=20, bg="#3C3C3C", fg="white", insertbackground="white")
-start_entry.grid(row=0, column=1, padx=5)
-start_btn = ttk.Button(control_frame, text="Start Process", command=lambda: start_process(start_entry.get()))
-start_btn.grid(row=0, column=2, padx=5)
+# Start Process
+start_frame = tk.Frame(control_frame, bg="#3A4A4B")
+start_frame.pack(side="left", padx=10)
+start_label = tk.Label(start_frame, text="START PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
+start_label.pack()
+start_entry = tk.Entry(start_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
+start_entry.pack(pady=2)
+start_btn = ttk.Button(start_frame, text="Start", command=lambda: start_process(start_entry.get()))
+start_btn.pack()
 
-kill_entry = tk.Entry(control_frame, width=10, bg="#3C3C3C", fg="white", insertbackground="white")
-kill_entry.grid(row=0, column=3, padx=5)
-kill_btn = ttk.Button(control_frame, text="Kill Process", command=lambda: kill_process(kill_entry.get()))
-kill_btn.grid(row=0, column=4, padx=5)
+# Kill Process
+kill_frame = tk.Frame(control_frame, bg="#3A4A4B")
+kill_frame.pack(side="left", padx=10)
+kill_label = tk.Label(kill_frame, text="KILL PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
+kill_label.pack()
+kill_entry = tk.Entry(kill_frame, width=10, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
+kill_entry.pack(pady=2)
+kill_btn = ttk.Button(kill_frame, text="Kill", command=lambda: kill_process(kill_entry.get()))
+kill_btn.pack()
 
-# Search Feature
-search_entry = tk.Entry(control_frame, width=20, bg="#3C3C3C", fg="white", insertbackground="white")
-search_entry.grid(row=0, column=5, padx=5)
-search_btn = ttk.Button(control_frame, text="Search Process", command=lambda: search_process(search_entry.get()))
-search_btn.grid(row=0, column=6, padx=5)
+# Search Process
+search_frame = tk.Frame(control_frame, bg="#3A4A4B")
+search_frame.pack(side="left", padx=10)
+search_label = tk.Label(search_frame, text="SEARCH PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
+search_label.pack()
+search_entry = tk.Entry(search_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
+search_entry.pack(pady=2)
+search_btn = ttk.Button(search_frame, text="Search", command=lambda: search_process(search_entry.get()))
+search_btn.pack()
 
-# Status Label
-status_label = tk.Label(root, text="Status: Listening...", font=("Arial", 12), bg="#2E2E2E", fg="#FFD700")
-status_label.pack(pady=5)
+# Mic Icon (Center)
+mic_frame = tk.Frame(root, bg="#3A4A4B")
+mic_frame.grid(row=3, column=0, columnspan=3, pady=10)
+mic_img = tk.PhotoImage(file="/Users/harshkumar/Python Tutorial/College PPTs/VoiceOSManager/mic.png").subsample(4, 4)  # Scale to ~50x50
+mic_label = tk.Label(mic_frame, image=mic_img, bg="#3A4A4B")
+mic_label.pack()
 
-# Log Area
-log_frame = tk.Frame(root, bg="#2E2E2E")
-log_frame.pack(fill="x", padx=10, pady=5)
-log = tk.Text(log_frame, height=8, bg="#3C3C3C", fg="white", font=("Arial", 10), wrap="word")
-log.pack(side="left", fill="x", expand=True)
-log_scroll = ttk.Scrollbar(log_frame, orient="vertical", command=log.yview)
-log.configure(yscrollcommand=log_scroll.set)
-log_scroll.pack(side="right", fill="y")
+# Graph and Listening (Bottom)
+bottom_frame = tk.Frame(root, bg="#3A4A4B")
+bottom_frame.grid(row=4, column=0, columnspan=3, pady=10)
+fig, ax = plt.subplots(figsize=(3, 1.5), facecolor="#3A4A4B")
+ax.set_facecolor("#4A5A5B")
+ax.tick_params(colors="white", labelsize=6)
+canvas = FigureCanvasTkAgg(fig, master=bottom_frame)
+canvas.get_tk_widget().pack()
+listening_label = tk.Label(bottom_frame, text="LISTENING...", font=("Orbitron", 10), bg="#3A4A4B", fg="#FF99FF")
+listening_label.pack()
+def pulse_listening():
+    current_color = listening_label.cget("fg")
+    listening_label.config(fg="#FFCCFF" if current_color == "#FF99FF" else "#FF99FF")
+    root.after(500, pulse_listening)
+pulse_listening()
 
 # Voice Recognizer & OS Detection
 recognizer = sr.Recognizer()
 OS = platform.system()
 
-# Update Process List
+# Process List Management
 def update_process_list():
     for i in tree.get_children():
         tree.delete(i)
-    for proc in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']):
+    for idx, proc in enumerate(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent'])):
         cpu = proc.info['cpu_percent']
         mem = proc.info['memory_percent']
         cpu_str = f"{cpu:.1f}" if cpu is not None else "N/A"
         mem_str = f"{mem:.1f}" if mem is not None else "N/A"
-        tree.insert("", "end", values=(proc.info['pid'], proc.info['name'], cpu_str, mem_str))
+        tree.insert("", "end", values=(proc.info['pid'], proc.info['name'], cpu_str, mem_str), tags=("even" if idx % 2 == 0 else "odd"))
+    tree.tag_configure("even", background="#3A4A4B")
+    tree.tag_configure("odd", background="#4A5A5B")
+    update_graph()
     root.after(5000, update_process_list)
 
-# Search Process Function
+# Progress Bar Update on Selection
+def on_select(event):
+    selected = tree.selection()
+    if selected:
+        values = tree.item(selected[0], "values")
+        cpu = float(values[2]) if values[2] != "N/A" else 0
+        mem = float(values[3]) if values[3] != "N/A" else 0
+        cpu_progress.config(value=cpu)
+        mem_progress.config(value=mem)
+
+tree.bind("<<TreeviewSelect>>", on_select)
+
 def search_process(name):
     if not name.strip():
-        messagebox.showwarning("Warning", "Please enter a process name to search")
+        messagebox.showwarning("Warning", "Enter a process name")
         return
     for item in tree.get_children():
-        values = tree.item(item, "values")
-        if name.lower() in values[1].lower():  # values[1] is the process name
-            tree.selection_set(item)  # Highlight the row
-            tree.see(item)  # Scroll to the row
-            log.insert(tk.END, f"Found process: {values[1]} (PID: {values[0]})\n")
-            log.see(tk.END)
+        if name.lower() in tree.item(item, "values")[1].lower():
+            tree.selection_set(item)
+            tree.see(item)
             return
-    log.insert(tk.END, f"No process found matching '{name}'\n")
     messagebox.showinfo("Search Result", f"No process found matching '{name}'")
+
+# Graph Update
+cpu_data, mem_data = [], []
+def update_graph():
+    total_cpu = psutil.cpu_percent()
+    total_mem = psutil.virtual_memory().percent
+    cpu_data.append(total_cpu)
+    mem_data.append(total_mem)
+    if len(cpu_data) > 2:  # Keep only latest values
+        cpu_data.pop(0)
+        mem_data.pop(0)
+    ax.clear()
+    ax.bar([0], [cpu_data[-1]], color="#66DFFF", width=0.4)
+    ax.bar([1], [mem_data[-1]], color="#FF99FF", width=0.4)
+    ax.set_ylim(0, 100)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["CPU", "Memory"], fontsize=6, color="white")
+    canvas.draw()
+    root.after(5000, update_graph)
 
 # Process Management Functions
 def start_process(app):
     try:
         if OS == "Windows":
             subprocess.Popen(app + ".exe")
-        elif OS == "Darwin":  # macOS
+        elif OS == "Darwin":
             subprocess.Popen(["open", "-a", app])
-        log.insert(tk.END, f"Started {app}\n")
     except Exception as e:
-        log.insert(tk.END, f"Error starting {app}: {e}\n")
-        messagebox.showerror("Error", f"Failed to start {app}")
+        messagebox.showerror("Error", f"Failed to start {app}: {e}")
 
 def kill_process(pid):
     try:
@@ -135,31 +198,22 @@ def kill_process(pid):
         time.sleep(0.5)
         if p.is_running():
             p.kill()
-        log.insert(tk.END, f"Killed process {pid}\n")
     except psutil.NoSuchProcess:
-        log.insert(tk.END, f"Error: Process {pid} does not exist\n")
         messagebox.showerror("Error", f"Process {pid} not found")
     except psutil.AccessDenied:
-        log.insert(tk.END, f"Error: Permission denied to kill {pid}. Try running with sudo.\n")
         messagebox.showerror("Error", f"Permission denied for {pid}. Run with sudo.")
     except ValueError:
-        log.insert(tk.END, f"Error: Invalid PID '{pid}' - must be a number\n")
         messagebox.showerror("Error", "Invalid PID - enter a number")
     except Exception as e:
-        log.insert(tk.END, f"Error killing {pid}: {e}\n")
         messagebox.showerror("Error", f"Failed to kill {pid}: {e}")
 
 def prioritize_process(app):
     for proc in psutil.process_iter(['name']):
         if app.lower() in proc.info['name'].lower():
             proc.nice(-10 if OS == "Windows" else 10)
-            log.insert(tk.END, f"Prioritized {app}\n")
-            break
 
 def check_deadlock():
-    log.insert(tk.END, "Simulating deadlock check...\n")
     time.sleep(2)
-    log.insert(tk.END, "No deadlock detected (simulated).\n")
 
 def ipc_process(conn):
     conn.send("Hello from child!")
@@ -169,7 +223,6 @@ def start_ipc_demo():
     parent_conn, child_conn = Pipe()
     p = Process(target=ipc_process, args=(child_conn,))
     p.start()
-    log.insert(tk.END, f"IPC Message: {parent_conn.recv()}\n")
     p.join()
 
 lock = threading.Lock()
@@ -190,25 +243,20 @@ def start_sync_demo():
         t.start()
     for t in threads:
         t.join()
-    log.insert(tk.END, f"Synchronized counter: {shared_counter}\n")
 
 # Voice Command Handler
 def get_voice_command():
     with sr.Microphone() as source:
-        status_label.config(text="Status: Listening...")
+        listening_label.config(text="LISTENING...")
         audio = recognizer.listen(source)
         try:
             command = recognizer.recognize_google(audio).lower()
-            log.insert(tk.END, f"You said: {command}\n")
-            log.see(tk.END)
             process_command(command)
-            status_label.config(text="Status: Command processed")
+            listening_label.config(text="Command processed")
         except sr.UnknownValueError:
-            log.insert(tk.END, "Didn’t understand that.\n")
-            status_label.config(text="Status: Unrecognized command")
+            listening_label.config(text="Unrecognized command")
         except sr.RequestError:
-            log.insert(tk.END, "Speech service error.\n")
-            status_label.config(text="Status: Speech service error")
+            listening_label.config(text="Speech service error")
 
 def process_command(command):
     if "list processes" in command:
@@ -236,4 +284,5 @@ def voice_loop():
 
 threading.Thread(target=voice_loop, daemon=True).start()
 update_process_list()
+update_graph()
 root.mainloop()
