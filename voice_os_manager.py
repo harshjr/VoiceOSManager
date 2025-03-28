@@ -14,15 +14,11 @@ from PIL import Image, ImageTk, ImageDraw
 
 # Function to make the mic image round
 def make_image_round(image_path, size):
-    # Open the image
     img = Image.open(image_path).convert("RGBA")
-    # Resize to the desired size
     img = img.resize((size, size), Image.Resampling.LANCZOS)
-    # Create a circular mask
     mask = Image.new("L", (size, size), 0)
     draw = ImageDraw.Draw(mask)
     draw.ellipse((0, 0, size, size), fill=255)
-    # Apply the mask
     img.putalpha(mask)
     return img
 
@@ -31,6 +27,10 @@ root = ThemedTk(theme="equilux")
 root.title("VoiceOS Manager")
 root.geometry("800x600")
 root.configure(bg="#3A4A4B")
+
+# Make the window resizable and allow full-screen
+root.columnconfigure(0, weight=1)
+root.rowconfigure(1, weight=1)
 
 # Styling
 style = ttk.Style()
@@ -44,27 +44,43 @@ style.map("Custom.Horizontal.TProgressbar", background=[("active", "#00FF00"), (
 
 # Header
 header = tk.Label(root, text="VoiceOS Manager", font=("Orbitron", 16, "bold"), bg="#3A4A4B", fg="white")
-header.grid(row=0, column=0, columnspan=3, pady=10)
+header.grid(row=0, column=0, pady=10, sticky="ew")
 
 # Process List (Top)
 process_frame = tk.Frame(root, bg="#3A4A4B")
-process_frame.grid(row=1, column=0, columnspan=3, padx=10, pady=5, sticky="nsew")
+process_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+process_frame.columnconfigure(0, weight=1)
 process_label = tk.Label(process_frame, text="VOICESS PROCESS", font=("Orbitron", 10, "bold"), bg="#3A4A4B", fg="white")
-process_label.pack()
+process_label.pack(fill="x")
 tree = ttk.Treeview(process_frame, columns=("PID", "Name", "CPU", "Memory"), show="headings", height=8)
 tree.heading("PID", text="PID")
 tree.heading("Name", text="Process Name")
 tree.heading("CPU", text="CPU %")
 tree.heading("Memory", text="Memory %")
-tree.column("PID", width=60, anchor="center")
-tree.column("Name", width=150)
-tree.column("CPU", width=80, anchor="center")
-tree.column("Memory", width=80, anchor="center")
 tree.pack(fill="both", expand=True)
 
 scrollbar = ttk.Scrollbar(process_frame, orient="vertical", command=tree.yview)
 tree.configure(yscrollcommand=scrollbar.set)
 scrollbar.pack(side="right", fill="y")
+
+# Function to resize Treeview columns dynamically
+def resize_columns(event=None):
+    tree_width = tree.winfo_width() - scrollbar.winfo_width()
+    if tree_width < 400:
+        tree_width = 400
+    pid_width = tree_width // 6
+    name_width = tree_width // 2
+    cpu_width = tree_width // 6
+    mem_width = tree_width // 6
+    total = pid_width + name_width + cpu_width + mem_width
+    if total < tree_width:
+        name_width += (tree_width - total)
+    tree.column("PID", width=pid_width, anchor="center")
+    tree.column("Name", width=name_width)
+    tree.column("CPU", width=cpu_width, anchor="center")
+    tree.column("Memory", width=mem_width, anchor="center")
+
+root.bind("<Configure>", resize_columns)
 
 # Progress Bars (Below Table)
 progress_frame = tk.Frame(process_frame, bg="#3A4A4B")
@@ -78,12 +94,16 @@ mem_progress_label.pack(side="left", padx=5)
 mem_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Custom.Horizontal.TProgressbar")
 mem_progress.pack(side="left", padx=5)
 
-# Control Buttons (Middle)
+# Control Buttons (Centered in Middle)
 control_frame = tk.Frame(root, bg="#3A4A4B")
-control_frame.grid(row=2, column=0, columnspan=3, pady=10)
+control_frame.grid(row=2, column=0, pady=10, sticky="ew")
+
+# Inner frame to group buttons and center them
+button_frame = tk.Frame(control_frame, bg="#3A4A4B")
+button_frame.pack(anchor="center")  # Center the button group
 
 # Start Process
-start_frame = tk.Frame(control_frame, bg="#3A4A4B")
+start_frame = tk.Frame(button_frame, bg="#3A4A4B")
 start_frame.pack(side="left", padx=5)
 start_label = tk.Label(start_frame, text="START PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 start_label.pack()
@@ -93,7 +113,7 @@ start_btn = ttk.Button(start_frame, text="Start", command=lambda: start_process(
 start_btn.pack()
 
 # Kill Process
-kill_frame = tk.Frame(control_frame, bg="#3A4A4B")
+kill_frame = tk.Frame(button_frame, bg="#3A4A4B")
 kill_frame.pack(side="left", padx=5)
 kill_label = tk.Label(kill_frame, text="KILL PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 kill_label.pack()
@@ -103,7 +123,7 @@ kill_btn = ttk.Button(kill_frame, text="Kill", command=lambda: kill_process(kill
 kill_btn.pack()
 
 # Prioritize Task
-prioritize_frame = tk.Frame(control_frame, bg="#3A4A4B")
+prioritize_frame = tk.Frame(button_frame, bg="#3A4A4B")
 prioritize_frame.pack(side="left", padx=5)
 prioritize_label = tk.Label(prioritize_frame, text="PRIORITIZE TASK", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 prioritize_label.pack()
@@ -113,7 +133,7 @@ prioritize_btn = ttk.Button(prioritize_frame, text="Prioritize", command=lambda:
 prioritize_btn.pack()
 
 # Search Process (with Mic Icon)
-search_frame = tk.Frame(control_frame, bg="#3A4A4B")
+search_frame = tk.Frame(button_frame, bg="#3A4A4B")
 search_frame.pack(side="left", padx=5)
 search_label = tk.Label(search_frame, text="SEARCH PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 search_label.pack()
@@ -121,17 +141,16 @@ search_inner_frame = tk.Frame(search_frame, bg="#3A4A4B")
 search_inner_frame.pack()
 search_entry = tk.Entry(search_inner_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
 search_entry.pack(side="left", pady=2)
-# Load and make the mic image round
-mic_img_pil = make_image_round("/Users/harshkumar/Python Tutorial/College PPTs/VoiceOSManager/mic.png", 20)  # 20x20 pixels
+mic_img_pil = make_image_round("/Users/harshkumar/Python Tutorial/College PPTs/VoiceOSManager/mic.png", 20)
 mic_img = ImageTk.PhotoImage(mic_img_pil)
 mic_label = tk.Label(search_inner_frame, image=mic_img, bg="#3A4A4B")
 mic_label.pack(side="left", padx=5)
 search_btn = ttk.Button(search_frame, text="Search", command=lambda: search_process(search_entry.get()))
 search_btn.pack()
 
-# Graph and Listening (Moved Up to Row 3)
+# Graph and Listening (Row 3)
 bottom_frame = tk.Frame(root, bg="#3A4A4B")
-bottom_frame.grid(row=3, column=0, columnspan=3, pady=10)
+bottom_frame.grid(row=3, column=0, pady=10, sticky="ew")
 fig, ax = plt.subplots(figsize=(3, 1.5), facecolor="#3A4A4B")
 ax.set_facecolor("#4A5A5B")
 ax.tick_params(colors="white", labelsize=6)
@@ -171,7 +190,7 @@ def on_select(event):
         values = tree.item(selected[0], "values")
         cpu = float(values[2]) if values[2] != "N/A" else 0
         mem = float(values[3]) if values[3] != "N/A" else 0
-        print(f"Selected process - CPU: {cpu}, Memory: {mem}")  # Debug print
+        print(f"Selected process - CPU: {cpu}, Memory: {mem}")
         cpu_progress.config(value=cpu)
         mem_progress.config(value=mem)
 
