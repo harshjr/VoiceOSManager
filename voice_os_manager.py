@@ -107,12 +107,25 @@ def start_process(app):
 
 def kill_process(pid):
     try:
-        p = psutil.Process(int(pid))
-        p.terminate()
+        pid = int(pid)  # Ensure PID is an integer
+        p = psutil.Process(pid)
+        p.terminate()  # Try SIGTERM first
+        time.sleep(0.5)  # Give it a moment to terminate
+        if p.is_running():  # Check if still alive
+            p.kill()  # Force kill with SIGKILL
         log.insert(tk.END, f"Killed process {pid}\n")
+    except psutil.NoSuchProcess:
+        log.insert(tk.END, f"Error: Process {pid} does not exist\n")
+        messagebox.showerror("Error", f"Process {pid} not found")
+    except psutil.AccessDenied:
+        log.insert(tk.END, f"Error: Permission denied to kill {pid}. Try running with sudo.\n")
+        messagebox.showerror("Error", f"Permission denied for {pid}. Run with sudo.")
+    except ValueError:
+        log.insert(tk.END, f"Error: Invalid PID '{pid}' - must be a number\n")
+        messagebox.showerror("Error", "Invalid PID - enter a number")
     except Exception as e:
         log.insert(tk.END, f"Error killing {pid}: {e}\n")
-        messagebox.showerror("Error", f"Failed to kill {pid}")
+        messagebox.showerror("Error", f"Failed to kill {pid}: {e}")
 
 def prioritize_process(app):
     for proc in psutil.process_iter(['name']):
