@@ -12,7 +12,7 @@ from multiprocessing import Process, Pipe
 root = tk.Tk()
 root.title("VoiceOS Manager")
 root.geometry("900x700")
-root.configure(bg="#2E2E2E")  # Dark background
+root.configure(bg="#2E2E2E")
 
 # Styling
 style = ttk.Style()
@@ -50,7 +50,7 @@ scrollbar.pack(side="right", fill="y")
 control_frame = tk.Frame(root, bg="#2E2E2E")
 control_frame.pack(fill="x", padx=10, pady=5)
 
-# Buttons
+# Buttons and Entries
 refresh_btn = ttk.Button(control_frame, text="Refresh", command=lambda: update_process_list())
 refresh_btn.grid(row=0, column=0, padx=5)
 
@@ -63,6 +63,12 @@ kill_entry = tk.Entry(control_frame, width=10, bg="#3C3C3C", fg="white", insertb
 kill_entry.grid(row=0, column=3, padx=5)
 kill_btn = ttk.Button(control_frame, text="Kill Process", command=lambda: kill_process(kill_entry.get()))
 kill_btn.grid(row=0, column=4, padx=5)
+
+# Search Feature
+search_entry = tk.Entry(control_frame, width=20, bg="#3C3C3C", fg="white", insertbackground="white")
+search_entry.grid(row=0, column=5, padx=5)
+search_btn = ttk.Button(control_frame, text="Search Process", command=lambda: search_process(search_entry.get()))
+search_btn.grid(row=0, column=6, padx=5)
 
 # Status Label
 status_label = tk.Label(root, text="Status: Listening...", font=("Arial", 12), bg="#2E2E2E", fg="#FFD700")
@@ -81,7 +87,7 @@ log_scroll.pack(side="right", fill="y")
 recognizer = sr.Recognizer()
 OS = platform.system()
 
-# Update Process List (Fixed)
+# Update Process List
 def update_process_list():
     for i in tree.get_children():
         tree.delete(i)
@@ -91,7 +97,23 @@ def update_process_list():
         cpu_str = f"{cpu:.1f}" if cpu is not None else "N/A"
         mem_str = f"{mem:.1f}" if mem is not None else "N/A"
         tree.insert("", "end", values=(proc.info['pid'], proc.info['name'], cpu_str, mem_str))
-    root.after(5000, update_process_list)  # Refresh every 5 seconds
+    root.after(5000, update_process_list)
+
+# Search Process Function
+def search_process(name):
+    if not name.strip():
+        messagebox.showwarning("Warning", "Please enter a process name to search")
+        return
+    for item in tree.get_children():
+        values = tree.item(item, "values")
+        if name.lower() in values[1].lower():  # values[1] is the process name
+            tree.selection_set(item)  # Highlight the row
+            tree.see(item)  # Scroll to the row
+            log.insert(tk.END, f"Found process: {values[1]} (PID: {values[0]})\n")
+            log.see(tk.END)
+            return
+    log.insert(tk.END, f"No process found matching '{name}'\n")
+    messagebox.showinfo("Search Result", f"No process found matching '{name}'")
 
 # Process Management Functions
 def start_process(app):
@@ -107,12 +129,12 @@ def start_process(app):
 
 def kill_process(pid):
     try:
-        pid = int(pid)  # Ensure PID is an integer
+        pid = int(pid)
         p = psutil.Process(pid)
-        p.terminate()  # Try SIGTERM first
-        time.sleep(0.5)  # Give it a moment to terminate
-        if p.is_running():  # Check if still alive
-            p.kill()  # Force kill with SIGKILL
+        p.terminate()
+        time.sleep(0.5)
+        if p.is_running():
+            p.kill()
         log.insert(tk.END, f"Killed process {pid}\n")
     except psutil.NoSuchProcess:
         log.insert(tk.END, f"Error: Process {pid} does not exist\n")
@@ -130,7 +152,7 @@ def kill_process(pid):
 def prioritize_process(app):
     for proc in psutil.process_iter(['name']):
         if app.lower() in proc.info['name'].lower():
-            proc.nice(-10 if OS == "Windows" else 10)  # Higher priority
+            proc.nice(-10 if OS == "Windows" else 10)
             log.insert(tk.END, f"Prioritized {app}\n")
             break
 
