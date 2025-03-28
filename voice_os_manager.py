@@ -39,8 +39,6 @@ style.configure("Treeview.Heading", background="#4A5A5B", foreground="#66DFFF", 
 style.map("Treeview", background=[("selected", "#66DFFF")])
 style.configure("TButton", font=("Orbitron", 9), padding=6, background="#66DFFF", foreground="white")
 style.map("TButton", background=[("active", "#99EFFF")])
-style.configure("Custom.Horizontal.TProgressbar", troughcolor="#FFFFFF")
-style.map("Custom.Horizontal.TProgressbar", background=[("active", "#00FF00"), ("!disabled", "#00FF00")])
 
 # Header
 header = tk.Label(root, text="VoiceOS Manager", font=("Orbitron", 16, "bold"), bg="#3A4A4B", fg="white")
@@ -82,17 +80,33 @@ def resize_columns(event=None):
 
 root.bind("<Configure>", resize_columns)
 
-# Progress Bars (Below Table)
+# Custom Progress Bars (Below Table)
 progress_frame = tk.Frame(process_frame, bg="#3A4A4B")
 progress_frame.pack(fill="x", pady=5)
-cpu_progress_label = tk.Label(progress_frame, text="CPU %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
-cpu_progress_label.pack(side="left", padx=5)
-cpu_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Custom.Horizontal.TProgressbar")
-cpu_progress.pack(side="left", padx=5)
-mem_progress_label = tk.Label(progress_frame, text="Memory %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
-mem_progress_label.pack(side="left", padx=5)
-mem_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Custom.Horizontal.TProgressbar")
-mem_progress.pack(side="left", padx=5)
+
+# CPU Progress Bar
+cpu_frame = tk.Frame(progress_frame, bg="#3A4A4B")
+cpu_frame.pack(side="left", padx=5)
+cpu_progress_label = tk.Label(cpu_frame, text="CPU %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
+cpu_progress_label.pack(side="left")
+cpu_canvas = tk.Canvas(cpu_frame, width=150, height=20, bg="#3A4A4B", highlightthickness=0)
+cpu_canvas.pack(side="left")
+# Draw white-bordered rectangle (100%)
+cpu_canvas.create_rectangle(2, 2, 148, 18, outline="#FFFFFF", fill="#3A4A4B", tags="cpu_border")
+# Draw green fill (initially 0%)
+cpu_canvas.create_rectangle(2, 2, 2, 18, fill="#00FF00", outline="", tags="cpu_fill")
+
+# Memory Progress Bar
+mem_frame = tk.Frame(progress_frame, bg="#3A4A4B")
+mem_frame.pack(side="left", padx=5)
+mem_progress_label = tk.Label(mem_frame, text="Memory %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
+mem_progress_label.pack(side="left")
+mem_canvas = tk.Canvas(mem_frame, width=150, height=20, bg="#3A4A4B", highlightthickness=0)
+mem_canvas.pack(side="left")
+# Draw white-bordered rectangle (100%)
+mem_canvas.create_rectangle(2, 2, 148, 18, outline="#FFFFFF", fill="#3A4A4B", tags="mem_border")
+# Draw green fill (initially 0%)
+mem_canvas.create_rectangle(2, 2, 2, 18, fill="#00FF00", outline="", tags="mem_fill")
 
 # Control Buttons (Centered in Middle)
 control_frame = tk.Frame(root, bg="#3A4A4B")
@@ -100,7 +114,7 @@ control_frame.grid(row=2, column=0, pady=10, sticky="ew")
 
 # Inner frame to group buttons and center them
 button_frame = tk.Frame(control_frame, bg="#3A4A4B")
-button_frame.pack(anchor="center")  # Center the button group
+button_frame.pack(anchor="center")
 
 # Start Process
 start_frame = tk.Frame(button_frame, bg="#3A4A4B")
@@ -190,9 +204,13 @@ def on_select(event):
         values = tree.item(selected[0], "values")
         cpu = float(values[2]) if values[2] != "N/A" else 0
         mem = float(values[3]) if values[3] != "N/A" else 0
-        print(f"Selected process - CPU: {cpu}, Memory: {mem}")
-        cpu_progress.config(value=cpu)
-        mem_progress.config(value=mem)
+        print(f"Selected process - CPU: {cpu}, Memory: {mem}")  # Debug print
+        # Update CPU progress bar
+        cpu_width = (cpu / 100) * 146  # 146 is the inner width (148 - 2)
+        cpu_canvas.coords("cpu_fill", 2, 2, 2 + cpu_width, 18)
+        # Update Memory progress bar
+        mem_width = (mem / 100) * 146
+        mem_canvas.coords("mem_fill", 2, 2, 2 + mem_width, 18)
 
 tree.bind("<<TreeviewSelect>>", on_select)
 
