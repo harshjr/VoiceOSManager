@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ttkthemes import ThemedTk
 from PIL import Image, ImageTk, ImageDraw
+import os
 
 # Function to make the mic image round
 def make_image_round(image_path, size):
@@ -98,7 +99,7 @@ start_entry.pack(pady=2)
 start_btn = ttk.Button(start_frame, text="Start", command=lambda: start_process(start_entry.get()))
 start_btn.pack()
 
-# Kill Process (Reverted to single input field)
+# Kill Process
 kill_frame = tk.Frame(button_frame, bg="#3A4A4B")
 kill_frame.pack(side="left", padx=5)
 kill_label = tk.Label(kill_frame, text="KILL PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
@@ -127,7 +128,10 @@ search_inner_frame = tk.Frame(search_frame, bg="#3A4A4B")
 search_inner_frame.pack()
 search_entry = tk.Entry(search_inner_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
 search_entry.pack(side="left", pady=2)
-mic_img_pil = make_image_round("/Users/harshkumar/Python Tutorial/College PPTs/VoiceOSManager/mic.png", 20)
+# Use a relative path for the mic image
+script_dir = os.path.dirname(os.path.abspath(__file__))
+mic_path = os.path.join(script_dir, "mic.png")
+mic_img_pil = make_image_round(mic_path, 20)
 mic_img = ImageTk.PhotoImage(mic_img_pil)
 mic_label = tk.Label(search_inner_frame, image=mic_img, bg="#3A4A4B")
 mic_label.pack(side="left", padx=5)
@@ -257,9 +261,18 @@ def update_graph():
 def start_process(app):
     try:
         if OS == "Windows":
-            subprocess.Popen(app + ".exe")
+            # On Windows, try to start the application directly
+            # Common apps like "notepad" can be started as "notepad.exe"
+            if not app.lower().endswith(".exe"):
+                app = app + ".exe"
+            subprocess.Popen([app], shell=True)
         elif OS == "Darwin":
+            # On macOS, use the "open -a" command
             subprocess.Popen(["open", "-a", app])
+        else:
+            messagebox.showerror("Error", f"Unsupported OS: {OS}")
+    except FileNotFoundError:
+        messagebox.showerror("Error", f"Application '{app}' not found. Please check the name and try again.")
     except Exception as e:
         messagebox.showerror("Error", f"Failed to start {app}: {e}")
 
@@ -283,7 +296,7 @@ def kill_process(identifier):
         except psutil.NoSuchProcess:
             messagebox.showerror("Error", f"Process with PID {pid} not found")
         except psutil.AccessDenied:
-            messagebox.showerror("Error", f"Permission denied for PID {pid}. Run with sudo.")
+            messagebox.showerror("Error", f"Permission denied for PID {pid}. Run with sudo/admin privileges.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to kill PID {pid}: {e}")
     except ValueError:
@@ -303,7 +316,7 @@ def kill_process(identifier):
                 except psutil.NoSuchProcess:
                     continue
                 except psutil.AccessDenied:
-                    messagebox.showerror("Error", f"Permission denied for {process_name} (PID: {proc.info['pid']}). Run with sudo.")
+                    messagebox.showerror("Error", f"Permission denied for {process_name} (PID: {proc.info['pid']}). Run with sudo/admin privileges.")
                     return
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to kill {process_name}: {e}")
@@ -319,12 +332,19 @@ def prioritize_process(app):
     for proc in psutil.process_iter(['name']):
         if app.lower() in proc.info['name'].lower():
             try:
-                proc.nice(-10 if OS == "Windows" else 10)
+                # Adjust priority based on OS
+                if OS == "Windows":
+                    proc.nice(-10)  # Higher priority on Windows
+                elif OS == "Darwin":
+                    proc.nice(10)  # Higher priority on macOS
+                else:
+                    messagebox.showerror("Error", f"Unsupported OS: {OS}")
+                    return
                 messagebox.showinfo("Success", f"Prioritized {app}")
                 found = True
                 break
             except psutil.AccessDenied:
-                messagebox.showerror("Error", f"Permission denied for {app}. Run with sudo.")
+                messagebox.showerror("Error", f"Permission denied for {app}. Run with sudo/admin privileges.")
                 return
     if not found:
         messagebox.showerror("Error", f"Process {app} not found")
