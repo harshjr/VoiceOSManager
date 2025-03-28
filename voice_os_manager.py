@@ -10,12 +10,27 @@ from multiprocessing import Process, Pipe
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ttkthemes import ThemedTk
+from PIL import Image, ImageTk, ImageDraw
+
+# Function to make the mic image round
+def make_image_round(image_path, size):
+    # Open the image
+    img = Image.open(image_path).convert("RGBA")
+    # Resize to the desired size
+    img = img.resize((size, size), Image.Resampling.LANCZOS)
+    # Create a circular mask
+    mask = Image.new("L", (size, size), 0)
+    draw = ImageDraw.Draw(mask)
+    draw.ellipse((0, 0, size, size), fill=255)
+    # Apply the mask
+    img.putalpha(mask)
+    return img
 
 # GUI Setup with Theme
 root = ThemedTk(theme="equilux")
 root.title("VoiceOS Manager")
-root.geometry("800x600")  # Smaller window for simplicity
-root.configure(bg="#3A4A4B")  # Lighter background
+root.geometry("800x600")
+root.configure(bg="#3A4A4B")
 
 # Styling
 style = ttk.Style()
@@ -23,8 +38,9 @@ style.configure("Treeview", background="#3A4A4B", foreground="#66DFFF", fieldbac
 style.configure("Treeview.Heading", background="#4A5A5B", foreground="#66DFFF", font=("Orbitron", 10, "bold"))
 style.map("Treeview", background=[("selected", "#66DFFF")])
 style.configure("TButton", font=("Orbitron", 9), padding=6, background="#66DFFF", foreground="white")
-style.map("TButton", background=[("active", "#99EFFF")])  # Lighter hover
-style.configure("Horizontal.TProgressbar", troughcolor="#3A4A4B", background="#66DFFF")
+style.map("TButton", background=[("active", "#99EFFF")])
+style.configure("Custom.Horizontal.TProgressbar", troughcolor="#FFFFFF")
+style.map("Custom.Horizontal.TProgressbar", background=[("active", "#00FF00"), ("!disabled", "#00FF00")])
 
 # Header
 header = tk.Label(root, text="VoiceOS Manager", font=("Orbitron", 16, "bold"), bg="#3A4A4B", fg="white")
@@ -55,11 +71,11 @@ progress_frame = tk.Frame(process_frame, bg="#3A4A4B")
 progress_frame.pack(fill="x", pady=5)
 cpu_progress_label = tk.Label(progress_frame, text="CPU %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
 cpu_progress_label.pack(side="left", padx=5)
-cpu_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Horizontal.TProgressbar")
+cpu_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Custom.Horizontal.TProgressbar")
 cpu_progress.pack(side="left", padx=5)
 mem_progress_label = tk.Label(progress_frame, text="Memory %", font=("Orbitron", 8), bg="#3A4A4B", fg="white")
 mem_progress_label.pack(side="left", padx=5)
-mem_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Horizontal.TProgressbar")
+mem_progress = ttk.Progressbar(progress_frame, orient="horizontal", length=150, maximum=100, style="Custom.Horizontal.TProgressbar")
 mem_progress.pack(side="left", padx=5)
 
 # Control Buttons (Middle)
@@ -68,7 +84,7 @@ control_frame.grid(row=2, column=0, columnspan=3, pady=10)
 
 # Start Process
 start_frame = tk.Frame(control_frame, bg="#3A4A4B")
-start_frame.pack(side="left", padx=10)
+start_frame.pack(side="left", padx=5)
 start_label = tk.Label(start_frame, text="START PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 start_label.pack()
 start_entry = tk.Entry(start_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
@@ -78,7 +94,7 @@ start_btn.pack()
 
 # Kill Process
 kill_frame = tk.Frame(control_frame, bg="#3A4A4B")
-kill_frame.pack(side="left", padx=10)
+kill_frame.pack(side="left", padx=5)
 kill_label = tk.Label(kill_frame, text="KILL PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 kill_label.pack()
 kill_entry = tk.Entry(kill_frame, width=10, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
@@ -86,26 +102,36 @@ kill_entry.pack(pady=2)
 kill_btn = ttk.Button(kill_frame, text="Kill", command=lambda: kill_process(kill_entry.get()))
 kill_btn.pack()
 
-# Search Process
+# Prioritize Task
+prioritize_frame = tk.Frame(control_frame, bg="#3A4A4B")
+prioritize_frame.pack(side="left", padx=5)
+prioritize_label = tk.Label(prioritize_frame, text="PRIORITIZE TASK", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
+prioritize_label.pack()
+prioritize_entry = tk.Entry(prioritize_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
+prioritize_entry.pack(pady=2)
+prioritize_btn = ttk.Button(prioritize_frame, text="Prioritize", command=lambda: prioritize_process(prioritize_entry.get()))
+prioritize_btn.pack()
+
+# Search Process (with Mic Icon)
 search_frame = tk.Frame(control_frame, bg="#3A4A4B")
-search_frame.pack(side="left", padx=10)
+search_frame.pack(side="left", padx=5)
 search_label = tk.Label(search_frame, text="SEARCH PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
 search_label.pack()
-search_entry = tk.Entry(search_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
-search_entry.pack(pady=2)
+search_inner_frame = tk.Frame(search_frame, bg="#3A4A4B")
+search_inner_frame.pack()
+search_entry = tk.Entry(search_inner_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
+search_entry.pack(side="left", pady=2)
+# Load and make the mic image round
+mic_img_pil = make_image_round("/Users/harshkumar/Python Tutorial/College PPTs/VoiceOSManager/mic.png", 20)  # 20x20 pixels
+mic_img = ImageTk.PhotoImage(mic_img_pil)
+mic_label = tk.Label(search_inner_frame, image=mic_img, bg="#3A4A4B")
+mic_label.pack(side="left", padx=5)
 search_btn = ttk.Button(search_frame, text="Search", command=lambda: search_process(search_entry.get()))
 search_btn.pack()
 
-# Mic Icon (Center)
-mic_frame = tk.Frame(root, bg="#3A4A4B")
-mic_frame.grid(row=3, column=0, columnspan=3, pady=10)
-mic_img = tk.PhotoImage(file="/Users/harshkumar/Python Tutorial/College PPTs/VoiceOSManager/mic.png").subsample(4, 4)  # Scale to ~50x50
-mic_label = tk.Label(mic_frame, image=mic_img, bg="#3A4A4B")
-mic_label.pack()
-
-# Graph and Listening (Bottom)
+# Graph and Listening (Moved Up to Row 3)
 bottom_frame = tk.Frame(root, bg="#3A4A4B")
-bottom_frame.grid(row=4, column=0, columnspan=3, pady=10)
+bottom_frame.grid(row=3, column=0, columnspan=3, pady=10)
 fig, ax = plt.subplots(figsize=(3, 1.5), facecolor="#3A4A4B")
 ax.set_facecolor("#4A5A5B")
 ax.tick_params(colors="white", labelsize=6)
@@ -145,6 +171,7 @@ def on_select(event):
         values = tree.item(selected[0], "values")
         cpu = float(values[2]) if values[2] != "N/A" else 0
         mem = float(values[3]) if values[3] != "N/A" else 0
+        print(f"Selected process - CPU: {cpu}, Memory: {mem}")  # Debug print
         cpu_progress.config(value=cpu)
         mem_progress.config(value=mem)
 
@@ -168,7 +195,7 @@ def update_graph():
     total_mem = psutil.virtual_memory().percent
     cpu_data.append(total_cpu)
     mem_data.append(total_mem)
-    if len(cpu_data) > 2:  # Keep only latest values
+    if len(cpu_data) > 2:
         cpu_data.pop(0)
         mem_data.pop(0)
     ax.clear()
@@ -208,9 +235,22 @@ def kill_process(pid):
         messagebox.showerror("Error", f"Failed to kill {pid}: {e}")
 
 def prioritize_process(app):
+    if not app.strip():
+        messagebox.showwarning("Warning", "Enter a process name to prioritize")
+        return
+    found = False
     for proc in psutil.process_iter(['name']):
         if app.lower() in proc.info['name'].lower():
-            proc.nice(-10 if OS == "Windows" else 10)
+            try:
+                proc.nice(-10 if OS == "Windows" else 10)
+                messagebox.showinfo("Success", f"Prioritized {app}")
+                found = True
+                break
+            except psutil.AccessDenied:
+                messagebox.showerror("Error", f"Permission denied for {app}. Run with sudo.")
+                return
+    if not found:
+        messagebox.showerror("Error", f"Process {app} not found")
 
 def check_deadlock():
     time.sleep(2)
