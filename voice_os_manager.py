@@ -154,31 +154,85 @@ pulse_listening()
 recognizer = sr.Recognizer()
 OS = platform.system()
 
+# Variable to store the current search term
+current_search_term = ""
+
 # Process List Management
 def update_process_list():
+    global current_search_term
+    search_term = current_search_term.lower()
+    
+    # Clear the table
     for i in tree.get_children():
         tree.delete(i)
+    
+    # Get all processes
+    processes = []
     for idx, proc in enumerate(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent'])):
         cpu = proc.info['cpu_percent']
         mem = proc.info['memory_percent']
         cpu_str = f"{cpu:.1f}" if cpu is not None else "N/A"
         mem_str = f"{mem:.1f}" if mem is not None else "N/A"
-        tree.insert("", "end", values=(proc.info['pid'], proc.info['name'], cpu_str, mem_str), tags=("even" if idx % 2 == 0 else "odd"))
+        processes.append({
+            "pid": proc.info['pid'],
+            "name": proc.info['name'],
+            "cpu": cpu_str,
+            "mem": mem_str,
+            "idx": idx
+        })
+    
+    # Sort processes by name
+    processes.sort(key=lambda x: (x["name"].lower(), x["pid"]))
+    
+    # Filter processes if there's a search term
+    if search_term:
+        filtered_processes = [p for p in processes if search_term in p["name"].lower()]
+    else:
+        filtered_processes = processes
+    
+    # Populate the table with filtered processes
+    matching_items = []
+    for p in filtered_processes:
+        item = tree.insert("", "end", values=(p["pid"], p["name"], p["cpu"], p["mem"]), tags=("even" if p["idx"] % 2 == 0 else "odd"))
+        if search_term and search_term in p["name"].lower():
+            matching_items.append(item)
+    
+    # Apply styling
     tree.tag_configure("even", background="#3A4A4B")
     tree.tag_configure("odd", background="#4A5A5B")
+    
+    # Highlight matching processes if there's a search term
+    if search_term and matching_items:
+        tree.selection_set(matching_items)
+        tree.see(matching_items[0])
+    
     update_graph()
     root.after(5000, update_process_list)
 
 def search_process(name):
+    global current_search_term
     if not name.strip():
         messagebox.showwarning("Warning", "Enter a process name")
+        current_search_term = ""
+        search_entry.delete(0, tk.END)  # Clear the entry box
         return
-    for item in tree.get_children():
-        if name.lower() in tree.item(item, "values")[1].lower():
-            tree.selection_set(item)
-            tree.see(item)
-            return
-    messagebox.showinfo("Search Result", f"No process found matching '{name}'")
+    current_search_term = name
+    # Trigger an immediate update to reflect the search
+    update_process_list()
+
+# Function to handle changes in the search entry
+def on_search_entry_change(*args):
+    global current_search_term
+    search_term = search_entry.get()
+    if not search_term.strip():
+        current_search_term = ""
+        update_process_list()  # Revert to full list when search is cleared
+    else:
+        current_search_term = search_term
+        update_process_list()
+
+# Bind the search entry to detect changes
+search_entry.bind("<KeyRelease>", on_search_entry_change)
 
 # Graph Update
 cpu_data, mem_data = [], []
