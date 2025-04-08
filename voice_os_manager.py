@@ -12,6 +12,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from ttkthemes import ThemedTk
 from PIL import Image, ImageTk, ImageDraw
 import os
+from datetime import datetime
 
 class SecurityManager:
     def __init__(self):
@@ -27,9 +28,10 @@ class LoginWindow:
         self.security_manager = SecurityManager()
         self.root.title("VoiceOS Manager Login")
         self.root.geometry("400x300")
+        self.root.configure(bg="#1E1E1E")
         self.show_login_screen()
     def show_login_screen(self):
-        self.login_frame = tk.Frame(self.root)
+        self.login_frame = tk.Frame(self.root, bg="#1E1E1E")
         self.login_frame.pack(expand=True)
         tk.Label(self.login_frame, text="VoiceOS Manager Login", font=("Arial", 16)).pack(pady=20)
         tk.Label(self.login_frame, text="Username:").pack()
@@ -61,15 +63,15 @@ class VoiceOSManager:
     def __init__(self, root):
         self.root = root
         self.root.title("VoiceOS Manager")
-        self.root.geometry("800x600")
-        self.root.configure(bg="#3A4A4B")
+        self.root.geometry("1200x800")
+        self.root.configure(bg="#1E1E1E")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
         self.style = ttk.Style()
-        self.style.configure("Treeview", background="#3A4A4B", foreground="#66DFFF", fieldbackground="#3A4A4B", rowheight=25)
-        self.style.configure("Treeview.Heading", background="#4A5A5B", foreground="#66DFFF", font=("Orbitron", 10, "bold"))
-        self.style.map("Treeview", background=[("selected", "#66DFFF")])
-        self.style.configure("TButton", font=("Orbitron", 9), padding=6, background="#66DFFF", foreground="white")
+        self.style.configure("Treeview", background="#2D2D2D", foreground="white", fieldbackground="#2D2D2D", rowheight=30)
+        self.style.configure("Treeview.Heading", background="#1E1E1E", foreground="#66DFFF", font=("Orbitron", 10, "bold"))
+        self.style.map("Treeview", background=[("selected", "#66DFFF")], foreground=[("selected", "black")])
+        self.style.configure("TButton", font=("Orbitron", 9), padding=6, background="#66DFFF", foreground="black")
         self.style.map("TButton", background=[("active", "#99EFFF")])
         self.recognizer = sr.Recognizer()
         self.OS = platform.system()
@@ -80,142 +82,302 @@ class VoiceOSManager:
         self.setup_gui()
         self.update_process_list()
         self.update_graph()
+        self.update_status_bar()
         threading.Thread(target=self.voice_loop, daemon=True).start()
     def setup_gui(self):
-        self.header = tk.Label(self.root, text="VoiceOS Manager", font=("Orbitron", 16, "bold"), bg="#3A4A4B", fg="white")
-        self.header.grid(row=0, column=0, pady=10, sticky="ew")
-        self.process_frame = tk.Frame(self.root, bg="#3A4A4B")
-        self.process_frame.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
-        self.process_frame.columnconfigure(0, weight=1)
-        self.process_label = tk.Label(self.process_frame, text="VOICESS PROCESS", font=("Orbitron", 10, "bold"), bg="#3A4A4B", fg="white")
-        self.process_label.pack(fill="x")
-        self.tree = ttk.Treeview(self.process_frame, columns=("PID", "Name", "CPU", "Memory"), show="headings", height=8)
-        self.tree.heading("PID", text="PID")
-        self.tree.heading("Name", text="Process Name")
-        self.tree.heading("CPU", text="CPU %")
-        self.tree.heading("Memory", text="Memory %")
-        self.tree.pack(fill="both", expand=True)
-        self.scrollbar = ttk.Scrollbar(self.process_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.pack(side="right", fill="y")
-        def resize_columns(event=None):
-            tree_width = self.tree.winfo_width() - self.scrollbar.winfo_width()
-            if tree_width < 400:
-                tree_width = 400
-            pid_width = tree_width // 6
-            name_width = tree_width // 2
-            cpu_width = tree_width // 6
-            mem_width = tree_width // 6
-            total = pid_width + name_width + cpu_width + mem_width
-            if total < tree_width:
-                name_width += (tree_width - total)
-            self.tree.column("PID", width=pid_width, anchor="center")
-            self.tree.column("Name", width=name_width)
-            self.tree.column("CPU", width=cpu_width, anchor="center")
-            self.tree.column("Memory", width=mem_width, anchor="center")
-        self.root.bind("<Configure>", resize_columns)
-        self.control_frame = tk.Frame(self.root, bg="#3A4A4B")
-        self.control_frame.grid(row=2, column=0, pady=10, sticky="ew")
-        self.button_frame = tk.Frame(self.control_frame, bg="#3A4A4B")
-        self.button_frame.pack(anchor="center")
-        self.start_frame = tk.Frame(self.button_frame, bg="#3A4A4B")
-        self.start_frame.pack(side="left", padx=5)
-        self.start_label = tk.Label(self.start_frame, text="START PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
-        self.start_label.pack()
-        self.start_entry = tk.Entry(self.start_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
-        self.start_entry.pack(pady=2)
-        self.start_btn = ttk.Button(self.start_frame, text="Start", command=lambda: self.start_process(self.start_entry.get()))
-        self.start_btn.pack()
-        self.kill_frame = tk.Frame(self.button_frame, bg="#3A4A4B")
-        self.kill_frame.pack(side="left", padx=5)
-        self.kill_label = tk.Label(self.kill_frame, text="KILL PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
-        self.kill_label.pack()
-        self.kill_entry = tk.Entry(self.kill_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
-        self.kill_entry.pack(pady=2)
-        self.kill_btn = ttk.Button(self.kill_frame, text="Kill", command=lambda: self.kill_process(self.kill_entry.get()))
-        self.kill_btn.pack()
-        self.prioritize_frame = tk.Frame(self.button_frame, bg="#3A4A4B")
-        self.prioritize_frame.pack(side="left", padx=5)
-        self.prioritize_label = tk.Label(self.prioritize_frame, text="PRIORITIZE TASK", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
-        self.prioritize_label.pack()
-        self.prioritize_entry = tk.Entry(self.prioritize_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
-        self.prioritize_entry.pack(pady=2)
-        self.prioritize_btn = ttk.Button(self.prioritize_frame, text="Prioritize", command=lambda: self.prioritize_process(self.prioritize_entry.get()))
-        self.prioritize_btn.pack()
-        self.search_frame = tk.Frame(self.button_frame, bg="#3A4A4B")
-        self.search_frame.pack(side="left", padx=5)
-        self.search_label = tk.Label(self.search_frame, text="SEARCH PROCESS", font=("Orbitron", 9, "bold"), bg="#3A4A4B", fg="white")
-        self.search_label.pack()
-        self.search_inner_frame = tk.Frame(self.search_frame, bg="#3A4A4B")
-        self.search_inner_frame.pack()
-        self.search_entry = tk.Entry(self.search_inner_frame, width=15, bg="#4A5A5B", fg="white", insertbackground="white", font=("Orbitron", 8))
-        self.search_entry.pack(side="left", pady=2)
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        mic_path = os.path.join(script_dir, "mic.png")
-        try:
-            mic_img_pil = make_image_round(mic_path, 20)
-            self.mic_img = ImageTk.PhotoImage(mic_img_pil)
-            self.mic_label = tk.Label(self.search_inner_frame, image=self.mic_img, bg="#3A4A4B")
-            self.mic_label.pack(side="left", padx=5)
-        except Exception as e:
-            print(f"Error loading mic image: {e}")
-            self.mic_label = tk.Label(self.search_inner_frame, text="[Mic]", bg="#3A4A4B", fg="white")
-            self.mic_label.pack(side="left", padx=5)
-        self.search_btn = ttk.Button(self.search_frame, text="Search", command=lambda: self.search_process(self.search_entry.get()))
-        self.search_btn.pack()
+        self.header_frame = tk.Frame(self.root, bg="#1E1E1E")
+        self.header_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        self.header = tk.Label(self.header_frame, text="VoiceOS Manager", font=("Orbitron", 24, "bold"), bg="#1E1E1E", fg="#66DFFF")
+        self.header.pack(side="left")
+        self.system_info = tk.Label(self.header_frame, text=f"OS: {platform.system()} {platform.release()}", font=("Orbitron", 10), bg="#1E1E1E", fg="white")
+        self.system_info.pack(side="right")
+        self.content_frame = tk.Frame(self.root, bg="#1E1E1E")
+        self.content_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        self.content_frame.columnconfigure(0, weight=1)
+        self.content_frame.rowconfigure(0, weight=1)
+        self.setup_process_list()
+        self.setup_control_panel()
+        self.setup_resource_monitor()
+        self.setup_status_bar()
+    def setup_process_list(self):
+        process_frame = tk.Frame(self.content_frame, bg="#1E1E1E")
+        process_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        process_frame.columnconfigure(0, weight=1)
+        process_frame.rowconfigure(1, weight=1)
+        
+        # Process List Header with enhanced styling
+        process_header = tk.Frame(process_frame, bg="#1E1E1E")
+        process_header.grid(row=0, column=0, sticky="ew", pady=(0, 5))
+        
+        # Title with gradient effect
+        title_label = tk.Label(
+            process_header,
+            text="Running Processes",
+            font=("Orbitron", 14, "bold"),
+            bg="#1E1E1E",
+            fg="#66DFFF"
+        )
+        title_label.pack(side="left")
+        
+        # Search Frame with enhanced styling
+        search_frame = tk.Frame(process_header, bg="#1E1E1E")
+        search_frame.pack(side="right")
+        
+        # Search Entry with placeholder
+        self.search_entry = tk.Entry(
+            search_frame,
+            width=30,
+            bg="#2D2D2D",
+            fg="white",
+            insertbackground="white",
+            font=("Orbitron", 9)
+        )
+        self.search_entry.pack(side="left", padx=5)
+        self.search_entry.insert(0, "Search processes...")
+        self.search_entry.bind("<FocusIn>", lambda e: self.search_entry.delete(0, "end") if self.search_entry.get() == "Search processes..." else None)
+        self.search_entry.bind("<FocusOut>", lambda e: self.search_entry.insert(0, "Search processes...") if not self.search_entry.get() else None)
         self.search_entry.bind("<KeyRelease>", self.on_search_entry_change)
-        self.bottom_frame = tk.Frame(self.root, bg="#3A4A4B")
-        self.bottom_frame.grid(row=3, column=0, pady=10, sticky="ew")
-        try:
-            self.fig, self.ax = plt.subplots(figsize=(3, 1.5), facecolor="#3A4A4B")
-            self.ax.set_facecolor("#4A5A5B")
-            self.ax.tick_params(colors="white", labelsize=6)
-            self.canvas = FigureCanvasTkAgg(self.fig, master=self.bottom_frame)
-            self.canvas.get_tk_widget().pack()
-        except Exception as e:
-            print(f"Error initializing Matplotlib graph: {e}")
-            self.fig = None
-            self.ax = None
-            self.canvas = None
-        self.listening_label = tk.Label(self.bottom_frame, text="LISTENING...", font=("Orbitron", 10), bg="#3A4A4B", fg="#FF99FF")
-        self.listening_label.pack()
-        self.pulse_listening()
-    def pulse_listening(self):
-        current_color = self.listening_label.cget("fg")
-        self.listening_label.config(fg="#FFCCFF" if current_color == "#FF99FF" else "#FF99FF")
-        self.root.after(500, self.pulse_listening)
+        
+        # Search Button with enhanced styling
+        search_btn = ttk.Button(
+            search_frame,
+            text="Search",
+            command=lambda: self.search_process(self.search_entry.get()),
+            style="Accent.TButton"
+        )
+        search_btn.pack(side="left", padx=5)
+        
+        # Process Treeview with enhanced styling
+        self.tree = ttk.Treeview(
+            process_frame,
+            columns=("PID", "Name", "CPU", "Memory", "Status"),
+            show="headings",
+            height=15,
+            style="Custom.Treeview"
+        )
+        self.tree.grid(row=1, column=0, sticky="nsew")
+        
+        # Configure Treeview Headings with enhanced styling
+        self.tree.heading("PID", text="PID", command=lambda: self.sort_column("PID", False))
+        self.tree.heading("Name", text="Process Name", command=lambda: self.sort_column("Name", False))
+        self.tree.heading("CPU", text="CPU %", command=lambda: self.sort_column("CPU", False))
+        self.tree.heading("Memory", text="Memory %", command=lambda: self.sort_column("Memory", False))
+        self.tree.heading("Status", text="Status", command=lambda: self.sort_column("Status", False))
+        
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(process_frame, orient="vertical", command=self.tree.yview)
+        scrollbar.grid(row=1, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        
+        # Configure custom styles
+        self.style.configure(
+            "Custom.Treeview",
+            background="#2D2D2D",
+            foreground="white",
+            fieldbackground="#2D2D2D",
+            rowheight=30,
+            font=("Orbitron", 9)
+        )
+        self.style.configure(
+            "Custom.Treeview.Heading",
+            background="#1E1E1E",
+            foreground="#66DFFF",
+            font=("Orbitron", 10, "bold")
+        )
+        self.style.configure(
+            "Accent.TButton",
+            font=("Orbitron", 9, "bold"),
+            background="#66DFFF",
+            foreground="black",
+            padding=5
+        )
+        self.style.map(
+            "Accent.TButton",
+            background=[("active", "#99EFFF")],
+            foreground=[("active", "black")]
+        )
+    def setup_control_panel(self):
+        control_frame = tk.Frame(self.content_frame, bg="#1E1E1E")
+        control_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=5)
+        
+        # Control Panel Title
+        control_title = tk.Label(
+            control_frame,
+            text="Process Controls",
+            font=("Orbitron", 14, "bold"),
+            bg="#1E1E1E",
+            fg="#66DFFF"
+        )
+        control_title.pack(pady=(0, 10))
+        
+        button_frame = tk.Frame(control_frame, bg="#1E1E1E")
+        button_frame.pack(expand=True)
+        
+        # Start Process Frame
+        start_frame = tk.Frame(button_frame, bg="#1E1E1E")
+        start_frame.pack(side="left", padx=10)
+        
+        start_label = tk.Label(
+            start_frame,
+            text="Start Process",
+            font=("Orbitron", 11, "bold"),
+            bg="#1E1E1E",
+            fg="#66DFFF"
+        )
+        start_label.pack()
+        
+        self.start_entry = tk.Entry(
+            start_frame,
+            width=20,
+            bg="#2D2D2D",
+            fg="white",
+            insertbackground="white",
+            font=("Orbitron", 9)
+        )
+        self.start_entry.pack(pady=2)
+        
+        start_btn = ttk.Button(
+            start_frame,
+            text="Start",
+            command=lambda: self.start_process(self.start_entry.get()),
+            style="Accent.TButton"
+        )
+        start_btn.pack()
+        
+        # Kill Process Frame
+        kill_frame = tk.Frame(button_frame, bg="#1E1E1E")
+        kill_frame.pack(side="left", padx=10)
+        
+        kill_label = tk.Label(
+            kill_frame,
+            text="Kill Process",
+            font=("Orbitron", 11, "bold"),
+            bg="#1E1E1E",
+            fg="#FF6666"
+        )
+        kill_label.pack()
+        
+        self.kill_entry = tk.Entry(
+            kill_frame,
+            width=20,
+            bg="#2D2D2D",
+            fg="white",
+            insertbackground="white",
+            font=("Orbitron", 9)
+        )
+        self.kill_entry.pack(pady=2)
+        
+        kill_btn = ttk.Button(
+            kill_frame,
+            text="Kill",
+            command=lambda: self.kill_process(self.kill_entry.get()),
+            style="Accent.TButton"
+        )
+        kill_btn.pack()
+        
+        # Prioritize Process Frame
+        prioritize_frame = tk.Frame(button_frame, bg="#1E1E1E")
+        prioritize_frame.pack(side="left", padx=10)
+        
+        prioritize_label = tk.Label(
+            prioritize_frame,
+            text="Prioritize Process",
+            font=("Orbitron", 11, "bold"),
+            bg="#1E1E1E",
+            fg="#99FF99"
+        )
+        prioritize_label.pack()
+        
+        self.prioritize_entry = tk.Entry(
+            prioritize_frame,
+            width=20,
+            bg="#2D2D2D",
+            fg="white",
+            insertbackground="white",
+            font=("Orbitron", 9)
+        )
+        self.prioritize_entry.pack(pady=2)
+        
+        prioritize_btn = ttk.Button(
+            prioritize_frame,
+            text="Prioritize",
+            command=lambda: self.prioritize_process(self.prioritize_entry.get()),
+            style="Accent.TButton"
+        )
+        prioritize_btn.pack()
+    def setup_resource_monitor(self):
+        monitor_frame = tk.Frame(self.content_frame, bg="#1E1E1E")
+        monitor_frame.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        graph_frame = tk.Frame(monitor_frame, bg="#1E1E1E")
+        graph_frame.pack(expand=True, fill="both")
+        cpu_frame = tk.Frame(graph_frame, bg="#1E1E1E")
+        cpu_frame.pack(side="left", expand=True, fill="both", padx=5)
+        tk.Label(cpu_frame, text="CPU Usage", font=("Orbitron", 10, "bold"), bg="#1E1E1E", fg="white").pack()
+        self.cpu_fig, self.cpu_ax = plt.subplots(figsize=(4, 2), facecolor="#1E1E1E")
+        self.cpu_ax.set_facecolor("#2D2D2D")
+        self.cpu_ax.tick_params(colors="white", labelsize=8)
+        self.cpu_canvas = FigureCanvasTkAgg(self.cpu_fig, master=cpu_frame)
+        self.cpu_canvas.get_tk_widget().pack(expand=True, fill="both")
+        mem_frame = tk.Frame(graph_frame, bg="#1E1E1E")
+        mem_frame.pack(side="left", expand=True, fill="both", padx=5)
+        tk.Label(mem_frame, text="Memory Usage", font=("Orbitron", 10, "bold"), bg="#1E1E1E", fg="white").pack()
+        self.mem_fig, self.mem_ax = plt.subplots(figsize=(4, 2), facecolor="#1E1E1E")
+        self.mem_ax.set_facecolor("#2D2D2D")
+        self.mem_ax.tick_params(colors="white", labelsize=8)
+        self.mem_canvas = FigureCanvasTkAgg(self.mem_fig, master=mem_frame)
+        self.mem_canvas.get_tk_widget().pack(expand=True, fill="both")
+    def setup_status_bar(self):
+        self.status_bar = tk.Frame(self.root, bg="#1E1E1E", height=25)
+        self.status_bar.grid(row=3, column=0, sticky="ew", padx=10, pady=5)
+        self.status_label = tk.Label(self.status_bar, text="Ready", font=("Orbitron", 9), bg="#1E1E1E", fg="white")
+        self.status_label.pack(side="left")
+        self.voice_status = tk.Label(self.status_bar, text="Listening...", font=("Orbitron", 9), bg="#1E1E1E", fg="#FF99FF")
+        self.voice_status.pack(side="right")
+    def update_status_bar(self):
+        cpu_percent = psutil.cpu_percent()
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        memory_used = memory.used / (1024 * 1024 * 1024)  # Convert to GB
+        status_text = f"CPU: {cpu_percent}% | Memory: {memory_percent}% ({memory_used:.1f} GB used)"
+        self.status_label.config(text=status_text)
+        self.root.after(1000, self.update_status_bar)
+    def sort_column(self, col, reverse):
+        items = [(self.tree.set(item, col), item) for item in self.tree.get_children("")]
+        items.sort(reverse=reverse)
+        for index, (val, item) in enumerate(items):
+            self.tree.move(item, "", index)
+        self.tree.heading(col, command=lambda: self.sort_column(col, not reverse))
     def update_process_list(self):
         search_term = self.current_search_term.lower()
         for i in self.tree.get_children():
             self.tree.delete(i)
         processes = []
-        for idx, proc in enumerate(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent'])):
-            cpu = proc.info['cpu_percent']
-            mem = proc.info['memory_percent']
-            cpu_str = f"{cpu:.1f}" if cpu is not None else "N/A"
-            mem_str = f"{mem:.1f}" if mem is not None else "N/A"
-            processes.append({
-                "pid": proc.info['pid'],
-                "name": proc.info['name'],
-                "cpu": cpu_str,
-                "mem": mem_str,
-                "idx": idx
-            })
+        for idx, proc in enumerate(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent', 'status'])):
+            try:
+                cpu = proc.info['cpu_percent']
+                mem = proc.info['memory_percent']
+                status = proc.info['status']
+                cpu_str = f"{cpu:.1f}" if cpu is not None else "N/A"
+                mem_str = f"{mem:.1f}" if mem is not None else "N/A"
+                processes.append({
+                    "pid": proc.info['pid'],
+                    "name": proc.info['name'],
+                    "cpu": cpu_str,
+                    "mem": mem_str,
+                    "status": status,
+                    "idx": idx
+                })
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
         processes.sort(key=lambda x: (x["name"].lower(), x["pid"]))
         if search_term:
             filtered_processes = [p for p in processes if search_term in p["name"].lower()]
         else:
             filtered_processes = processes
-        matching_items = []
         for p in filtered_processes:
-            item = self.tree.insert("", "end", values=(p["pid"], p["name"], p["cpu"], p["mem"]), tags=("even" if p["idx"] % 2 == 0 else "odd"))
-            if search_term and search_term in p["name"].lower():
-                matching_items.append(item)
-        self.tree.tag_configure("even", background="#3A4A4B")
-        self.tree.tag_configure("odd", background="#4A5A5B")
-        if search_term and matching_items:
-            self.tree.selection_set(matching_items)
-            self.tree.see(matching_items[0])
+            self.tree.insert("", "end", values=(p["pid"], p["name"], p["cpu"], p["mem"], p["status"]), tags=("even" if p["idx"] % 2 == 0 else "odd"))
+        self.tree.tag_configure("even", background="#2D2D2D")
+        self.tree.tag_configure("odd", background="#1E1E1E")
         self.root.after(5000, self.update_process_list)
     def search_process(self, name):
         if not name.strip():
@@ -234,25 +396,30 @@ class VoiceOSManager:
             self.current_search_term = search_term
             self.update_process_list()
     def update_graph(self):
-        if not hasattr(self, 'ax') or self.ax is None:
-            print("Matplotlib graph not available.")
+        if not hasattr(self, 'cpu_ax') or not hasattr(self, 'mem_ax'):
             self.root.after(5000, self.update_graph)
             return
         total_cpu = psutil.cpu_percent()
-        total_mem = psutil.virtual_memory().percent
         self.cpu_data.append(total_cpu)
-        self.mem_data.append(total_mem)
-        if len(self.cpu_data) > 2:
+        if len(self.cpu_data) > 20:
             self.cpu_data.pop(0)
+        self.cpu_ax.clear()
+        self.cpu_ax.plot(self.cpu_data, color="#66DFFF", linewidth=2)
+        self.cpu_ax.set_ylim(0, 100)
+        self.cpu_ax.set_facecolor("#2D2D2D")
+        self.cpu_ax.tick_params(colors="white", labelsize=8)
+        self.cpu_canvas.draw()
+        total_mem = psutil.virtual_memory().percent
+        self.mem_data.append(total_mem)
+        if len(self.mem_data) > 20:
             self.mem_data.pop(0)
-        self.ax.clear()
-        self.ax.bar([0], [self.cpu_data[-1]], color="#66DFFF", width=0.4)
-        self.ax.bar([1], [self.mem_data[-1]], color="#FF99FF", width=0.4)
-        self.ax.set_ylim(0, 100)
-        self.ax.set_xticks([0, 1])
-        self.ax.set_xticklabels(["CPU", "Memory"], fontsize=6, color="white")
-        self.canvas.draw()
-        self.root.after(5000, self.update_graph)
+        self.mem_ax.clear()
+        self.mem_ax.plot(self.mem_data, color="#FF99FF", linewidth=2)
+        self.mem_ax.set_ylim(0, 100)
+        self.mem_ax.set_facecolor("#2D2D2D")
+        self.mem_ax.tick_params(colors="white", labelsize=8)
+        self.mem_canvas.draw()
+        self.root.after(1000, self.update_graph)
     def start_process(self, app):
         try:
             if self.OS == "Windows":
@@ -357,20 +524,20 @@ class VoiceOSManager:
             t.join()
     def get_voice_command(self):
         with sr.Microphone() as source:
-            self.listening_label.config(text="LISTENING...")
+            self.voice_status.config(text="LISTENING...")
             try:
                 audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
                 command = self.recognizer.recognize_google(audio).lower()
                 self.process_command(command)
-                self.listening_label.config(text="Command processed")
+                self.voice_status.config(text="Command processed")
             except sr.UnknownValueError:
-                self.listening_label.config(text="Unrecognized command")
+                self.voice_status.config(text="Unrecognized command")
             except sr.RequestError:
-                self.listening_label.config(text="Speech service error")
+                self.voice_status.config(text="Speech service error")
             except sr.WaitTimeoutError:
-                self.listening_label.config(text="No command detected")
+                self.voice_status.config(text="No command detected")
             except Exception as e:
-                self.listening_label.config(text=f"Error: {e}")
+                self.voice_status.config(text=f"Error: {e}")
     def process_command(self, command):
         if "list processes" in command:
             self.update_process_list()
